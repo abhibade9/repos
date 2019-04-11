@@ -1,1 +1,4 @@
 whoami
+ifconfig
+hostname
+nslookup.exe in.ey.com
